@@ -1,0 +1,33 @@
+{
+    "name" : "zeeml/machinelearning",
+    "require" : {
+        "php" : ">=7.0.0",
+        "zeeml/dataset" : "dev-master",
+        "zeeml/algorithms" : "dev-master"
+    },
+    "repositories" : [ {
+        "type" : "composer",
+        "url" : "https://packagist.org/"
+    } ],
+    "require-dev" : {
+        "phpunit/phpunit" : "6.0.8"
+    },
+    "autoload-dev" : {
+        "psr-4" : {
+            "Zeeml\\MachineLearning\\" : "src/",
+            "Zeeml\\MachineLearning\\Tests\\" : "tests/fixtures"
+        }
+    },
+    "autoload" : {
+        "psr-4" : {
+            "Zeeml\\MachineLearning\\" : "src/"
+        }
+    },
+    "authors" : [ {
+        "name" : "Olivier Lépine",
+        "email" : "olivier@lepine.fr"
+    }, {
+        "name" : "Adil El Kanabi",
+        "email" : "adil.kanabi@gmail.com"
+    } ]
+}
