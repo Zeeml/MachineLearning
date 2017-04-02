@@ -29,5 +29,10 @@
     }, {
         "name" : "Adil El Kanabi",
         "email" : "adil.kanabi@gmail.com"
-    } ]
+    } ],
+   "config" : {
+    "preferred-install" : "dist"
+  },
+  "minimum-stability" : "dev",
+  "prefer-stable" : true
 }
