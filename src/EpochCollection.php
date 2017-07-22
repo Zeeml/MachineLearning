@@ -1,8 +1,12 @@
 <?php
 
-namespace Zeeml\Algorithms;
+namespace Zeeml\MachineLearning;
 
-use Zeeml\Algorithms\Algorithms\AlgorithmsInterface;
+use Zeeml\DataSet\DataSet;
+use Zeeml\DataSet\DataSetFactory;
+use Zeeml\MachineLearning\Exceptions\WrongUsageException;
+use Zeeml\DataSet\Exception\WrongUsageException as WrongDataSetUsageException;
+use Zeeml\MachineLearning\Traits\Process;
 
 /**
  * Class EpochCollection
@@ -10,53 +14,56 @@ use Zeeml\Algorithms\Algorithms\AlgorithmsInterface;
  */
 class EpochCollection implements \Iterator
 {
+    use Process;
+
     protected $position;
     protected $epochs;
 
+    protected $trainingSet;
+    protected $testSet;
+    protected $split;
+    protected $learningRate;
+
     /**
      * Functions that creates all the needed epochs
-     * @param AlgorithmsInterface $algorithm
+     * @param array $algorithms
+     * @param DataSet $dataSet
      * @param int $nbEpochs
      * @param float $learningRate
+     * @param float $split
      * @return EpochCollection
+     * @throws WrongUsageException
      */
-    public static function collectionFactory(AlgorithmsInterface $algorithm, int $nbEpochs = 1, float $learningRate = 0.0): EpochCollection
+    public function __construct(array $algorithms, DataSet $dataSet, int $nbEpochs = 1, float $learningRate = 0.0, float $split = 0.8)
     {
-        $epochsCollection = new self();
-        $epochsCollection->clear();
-        $nbEpochs = $nbEpochs < 1 ? 1 : $nbEpochs;
+        $this
+            ->clear()
+            ->setSplit($split)
+            ->createDataSets($dataSet)
+            ->setLearningRate($learningRate)
+            ->createEpochs($algorithms, $nbEpochs)
+        ;
+    }
 
-        for ($i = 0; $i < $nbEpochs; $i ++) {
-            $epoch = new Epoch(clone $algorithm, $i, $learningRate);
-            $epochsCollection->addEpoch($epoch);
+    /**
+     * Fits every epoch of the collection with hte list of algorithms
+     */
+    public function fit()
+    {
+        $this->busy();
+        foreach ($this->epochs as $epoch) {
+            $epoch->fit($this->trainingSet, $this->learningRate);
         }
-
-        return $epochsCollection;
+        $this->done();
     }
 
     /**
      * Init the epoch collection buy emptying the epochs
      */
-    public function clear()
+    private function clear(): EpochCollection
     {
         $this->position = 0;
         $this->epochs = [];
-    }
-
-    /**
-     * add a nex epoch to the collection
-     * @param Epoch $epoch
-     * @return EpochCollection
-     */
-    public function addEpoch(Epoch $epoch): EpochCollection
-    {
-        $previousEpoch = end($this->epochs);
-        if ($previousEpoch instanceof Epoch) {
-            $previousEpoch->setNext($epoch);
-            $epoch->setPrevious($previousEpoch);
-        }
-
-        $this->epochs[] = $epoch;
 
         return $this;
     }
@@ -65,9 +72,95 @@ class EpochCollection implements \Iterator
      * returns the last epoch
      * @return Epoch|null
      */
-    public function getLastEpoch()
+    public function getLastEpoch(): Epoch
     {
-        return $this->epochs[count($this->epochs) - 1]?? null;
+        return $this->epochs[count($this->epochs) - 1];
+    }
+
+    /**
+     * sets the split of the dataSet
+     * $split% will be used for training, (1 - $split%) will be used for test
+     * $split must be in interval ]0, 1]
+     * @param $split
+     * @throws WrongUsageException
+     * @return EpochCollection
+     */
+    private function setSplit($split): EpochCollection
+    {
+        $this->split = $split;
+
+        return $this;
+    }
+
+    /**
+     * sets the learning rate
+     * @param float $learningRate
+     * @return EpochCollection;
+     */
+    private function setLearningRate(float $learningRate): EpochCollection
+    {
+        $this->learningRate = $learningRate;
+
+        return $this;
+    }
+
+    /**
+     * Creates the Epochs
+     * @param array $algorithms
+     * @param int $nbEpochs
+     */
+    private function createEpochs(array $algorithms, int $nbEpochs)
+    {
+        $nbEpochs = $nbEpochs < 1 ? 1 : $nbEpochs;
+        for ($i = 0; $i < $nbEpochs; $i ++) {
+            $epoch = new Epoch($algorithms, $i, $this->learningRate);
+            $previousEpoch = end($this->epochs);
+            if ($previousEpoch instanceof Epoch) {
+                $previousEpoch->setNext($epoch);
+                $epoch->setPrevious($previousEpoch);
+            }
+
+            $this->epochs[] = $epoch;
+        }
+    }
+
+    /**
+     * function that creates the training and test dataSet based on the specified split
+     * @param DataSet $dataSet
+     * @return EpochCollection
+     * @throws WrongUsageException
+     */
+    private function createDataSets(DataSet $dataSet): EpochCollection
+    {
+        if (!$dataSet->isPrepared()) {
+            throw new WrongUsageException('DataSet must be prepared.');
+        }
+
+        try {
+            list($this->trainingSet, $this->testSet) = DataSetFactory::splitDataSet($dataSet, $this->split);
+        } catch (WrongDataSetUsageException $e) {
+            throw new WrongUsageException($e->getMessage());
+        }
+
+        return $this;
+    }
+
+    /**
+     * Returns the dataSet used from the training
+     * @return DataSet
+     */
+    public function getTrainingSet(): DataSet
+    {
+        return $this->trainingSet;
+    }
+
+    /**
+     * Returns the dataSet used from the training
+     * @return DataSet
+     */
+    public function getTestSet(): DataSet
+    {
+        return $this->testSet;
     }
 
     /**

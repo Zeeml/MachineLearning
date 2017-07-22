@@ -1,10 +1,9 @@
 <?php
 
-namespace Zeeml\Algorithms\Exceptions;
+namespace Zeeml\MachineLearning\Exceptions;
 
 /**
  * Class UnknownErrorException.php
- * @package Zeeml\Algorithms\Exceptions
  */
 class UnknownErrorException extends \Exception
 {

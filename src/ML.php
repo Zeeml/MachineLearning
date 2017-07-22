@@ -2,52 +2,76 @@
 
 namespace Zeeml\MachineLearning;
 
-use Zeeml\Dataset\Dataset;
-use Zeeml\Algorithms\Prediction\LinearRegression;
+use Zeeml\DataSet\DataSet;
+use Zeeml\MachineLearning\Exceptions\WrongUsageException;
+use Zeeml\MachineLearning\Traits\MLHash;
 
 class ML
 {
+    use MLHash;
     protected $algorithms;
-    
-    protected $dataset;
-    
-    protected $split;
-    
-    public function __construct(array $algorithms, Dataset $dataset, float $split = 0.8)
+    protected $learningRate;
+    protected $dataSet;
+    protected $epochsNumber;
+    protected $epochsCollections;
+
+    /**
+     * ML constructor.
+     * @param Dataset $dataSet
+     * @throws \Exception
+     */
+    public function __construct(DataSet $dataSet)
     {
-        foreach ($algorithms as $algorithmClass) {
-            $this->algorithms[$algorithmClass] = new $algorithmClass;
-        }
-        
-        $this->dataset = $dataset;
-        $this->split = $this->setSplit($split);
+        $this->dataSet = $dataSet;
+        $this->algorithms = [];
+        $this->epochsNumber = 1;
     }
-    
-    public function setSplit(float $split)
+
+    public function using(array $algorithms): ML
     {
-        if ($split <= 0 || $split > 1) {
-            throw new \Exception("Split value must be greater than 0 and lower than 1");
+        $this->algorithms = $algorithms;
+
+        return $this;
+    }
+
+    public function epochs(int $epochs): ML
+    {
+        if (empty($this->algorithms)) {
+            throw new WrongUsageException('Please specify the algorithms before the epochs');
         }
-        $this->split = $split;
-        
+
+        $this->epochsNumber = $epochs;
+
+        return $this;
+    }
+
+    /**
+     * fits the training dataSet
+     * @param float $split
+     * @param float $learningRate
+     * @return ML
+     * @throws WrongUsageException
+     */
+    public function fit(float $split = 0.8, float $learningRate = 0): ML
+    {
+        if (empty($this->algorithms)) {
+            throw new WrongUsageException("No algorithm specified");
+        }
+
+        $hash = $this->hash($this->algorithms, $this->epochsNumber, $learningRate, $split);
+        $epochCollection = $this->epochsCollections[$hash] ?? new EpochCollection($this->algorithms, $this->dataSet, $this->epochsNumber, $learningRate, $split);
+
+        if (! $epochCollection->isDone()) {
+            $epochCollection->fit();
+        }
+
+        $this->epochsCollections[$hash] = $epochCollection;
+
         return $this;
     }
     
-    public function fit()
+    public function test(): ML
     {
-        foreach ($this->algorithms as $algorithm) {
-            $algorithm->fit($this->split);
-        }
-        
-        return $this;
-    }
-    
-    public function test()
-    {
-        foreach ($this->algorithms as $algorithm) {
-            $algorithm->test(1 - $this->split);
-        }
-    
         return $this;
     }
     

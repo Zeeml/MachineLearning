@@ -1,9 +1,11 @@
 <?php
 
-namespace Zeeml\Algorithms;
+namespace Zeeml\MachineLearning;
 
-use Zeeml\Algorithms\Algorithms\AlgorithmsInterface;
-use Zeeml\Dataset\DatasetInterface;
+use Zeeml\Algorithms\AlgorithmsInterface;
+use Zeeml\DataSet\DataSet;
+use Zeeml\MachineLearning\Exceptions\WrongUsageException;
+use Zeeml\MachineLearning\Traits\Process;
 
 /**
  * Class Epoch
@@ -11,48 +13,47 @@ use Zeeml\Dataset\DatasetInterface;
  */
 class Epoch
 {
-    const STATUS_CREATED = 'created';
-    const STATUS_IN_PROGRESS = 'in progress';
-    const STATUS_FINISHED = 'finished';
+    use Process;
 
     protected $epoch;
-    protected $learningRate;
-    protected $status;
-    protected $algorithm;
+    protected $algorithms;
     protected $previous;
     protected $next;
     protected $hash;
 
     /**
      * Epoch constructor.
-     * @param AlgorithmsInterface $algorithm
+     * @param $algorithms $algorithms
      * @param int $epoch
-     * @param float $learningRate
      */
-    public function __construct(AlgorithmsInterface $algorithm, int $epoch, float $learningRate)
+    public function __construct(array $algorithms, int $epoch)
     {
-        $this->algorithm = $algorithm;
+        $this->setAlgorithms($algorithms);
         $this->epoch = $epoch;
-        $this->learningRate = $learningRate;
-        $this->status = self::STATUS_CREATED;
     }
 
     /**
      * trains the epoch using the algorithm
-     * @param DatasetInterface $dataset
+     * @param DataSet $dataSet
+     * @param float $learningRate
      */
-    public function train(DatasetInterface $dataset)
+    public function fit(DataSet $dataSet, float $learningRate)
     {
         $this->busy();
-        $this->algorithm->train($dataset, $this->learningRate, $this->previous()->algorithm?? null);
+
+        foreach ($this->algorithms as $algorithm) {
+            $previousAlgorithm = $this->previous() ? $this->previous()->getAlgorithm(get_class($algorithm)) : null;
+            $algorithm->fit($dataSet, $learningRate, $previousAlgorithm);
+        }
+
         $this->done();
     }
 
     /**
      * tests the epoch using the algorithm
-     * @param DatasetInterface $dataset
+     * @param DataSet $dataset
      */
-    public function test(DatasetInterface $dataset)
+    public function test(DataSet $dataset)
     {
         $this->busy();
         $this->algorithm->test($dataset);
@@ -106,27 +107,42 @@ class Epoch
     }
 
     /**
-     * flags the epoch as currently working
-     */
-    public function busy()
-    {
-        $this->status = self::STATUS_IN_PROGRESS;
-    }
-
-    /**
-     * flags the epoch as work done
-     */
-    public function done()
-    {
-        $this->status = self::STATUS_FINISHED;
-    }
-
-    /**
      * returns the algorithms used
      * @return AlgorithmsInterface
      */
-    public function getAlgorithm()
+    public function getAlgorithms()
     {
-        return $this->algorithm;
+        return $this->algorithms;
+    }
+
+    /**
+     * returns the specific algorithm if any
+     * @return AlgorithmsInterface
+     */
+    public function getAlgorithm($algorithmName)
+    {
+        return $this->algorithms[$algorithmName] ?? null;
+    }
+
+    public function setAlgorithms(array $algorithms)
+    {
+        foreach ($algorithms as $algorithm) {
+            if (class_exists($algorithm) && isset(class_implements($algorithm)[AlgorithmsInterface::class])) {
+                $this->algorithms[$algorithm] = new $algorithm;
+            }
+        }
+
+        if (empty($this->algorithms)) {
+            throw new WrongUsageException('No algorithm specified');
+        }
+    }
+
+    /**
+     * Returns the epoch's number
+     * @return int
+     */
+    public function getNumber(): int
+    {
+        return $this->epoch;
     }
 }

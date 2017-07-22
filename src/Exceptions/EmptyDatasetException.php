@@ -1,10 +1,9 @@
 <?php
 
-namespace Zeeml\Algorithms\Exceptions;
+namespace Zeeml\MachineLearning\Exceptions;
 
 /**
  * Class BadArgumentException
- * @package Zeeml\Algorithms\Exceptions
  */
 class EmptyDatasetException extends \Exception
 {
